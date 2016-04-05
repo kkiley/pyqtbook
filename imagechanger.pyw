@@ -14,6 +14,7 @@ import platform
 import sys
 
 from PyQt5.QtCore import QFile, Qt, QSettings, QByteArray, QFileInfo, QTimer, QT_VERSION_STR, PYQT_VERSION_STR
+# from PyQt5.QtCore import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtPrintSupport import *
@@ -21,7 +22,7 @@ from PyQt5.QtWidgets import *
 
 import helpform
 import newimagedlg
-import resizedlg
+import resizemenu
 import qrc_resources
 
 __version__ = "1.0.1"
@@ -51,6 +52,7 @@ class MainWindow(QMainWindow):
         self.imageLabel.setMinimumSize(200, 200)
         self.imageLabel.setAlignment(Qt.AlignCenter)
         self.imageLabel.setContextMenuPolicy(Qt.ActionsContextMenu)
+        # Set the imageLabel where the image file will be viewed
         self.setCentralWidget(self.imageLabel)
 
         logDockWidget = QDockWidget("Log", self)
@@ -93,6 +95,9 @@ class MainWindow(QMainWindow):
                                                      "toggled(bool)")
         editZoomAction = self.createAction("&Zoom...", self.editZoom,
                                            "Alt+Z", "editzoom", "Zoom the image")
+        editResizeAction = self.createAction("&Resize...", self.editResize,
+                                           "Ctrl+R", "editresize", "Resize the image")
+
         mirrorGroup = QActionGroup(self)
         editUnMirrorAction = self.createAction("&Unmirror",
                                                self.editUnMirror, "Ctrl+U", "editunmirror",
@@ -123,7 +128,7 @@ class MainWindow(QMainWindow):
         self.fileMenu.aboutToShow.connect(self.updateFileMenu)
         editMenu = self.menuBar().addMenu("&Edit")
         self.addActions(editMenu, (editInvertAction,
-                                   editSwapRedAndBlueAction, editZoomAction))
+                                   editSwapRedAndBlueAction, editZoomAction, editResizeAction))
         mirrorMenu = editMenu.addMenu(QIcon(":/editmirror.png"),
                                       "&Mirror")
         self.addActions(mirrorMenu, (editUnMirrorAction,
@@ -171,7 +176,8 @@ class MainWindow(QMainWindow):
         self.updateFileMenu()
         QTimer.singleShot(0, self.loadInitialFile)
 
-
+    # editZoomAction = self.createAction("&Zoom...", self.editZoom,
+    #                                    "Alt+Z", "editzoom", "Zoom the image")
 
     def createAction(self, text, slot=None, shortcut=None, icon=None,
                      tip=None, checkable=False, signal="triggered()"):
@@ -309,8 +315,7 @@ class MainWindow(QMainWindow):
         dir = (os.path.dirname(self.filename)
                if self.filename is not None else ".")
         formats = (["*.{}".format(format.data().decode("ascii").lower())
-                    for format in QImageReader.supportedImageFormats()])
-        print("File formats: {}".format(formats))
+                   for format in QImageReader.supportedImageFormats()])
         fname = QFileDialog.getOpenFileName(self,
                                             "Image Changer - Choose Image", dir,
                                             "Image files ({})".format(" ".join(formats)))
@@ -318,17 +323,13 @@ class MainWindow(QMainWindow):
         if fname:
 
             self.loadFile(fname[0])
-            print("Successful")
 
 
     def loadFile(self, fname=None):
-        # print(type(fname))
-        print("loadFile")
         if fname is False:
             fname = None
         if fname is None:
             action = self.sender()
-            # print("action: {}".format(action))
             if isinstance(action, QAction):
                 fname = action.data()
                 print("loadFile filename: {}".format(fname))
@@ -345,7 +346,6 @@ class MainWindow(QMainWindow):
             if image.isNull():
                 message = "Failed to read {}".format(fname)
             else:
-                # print("in else")
                 self.addRecentFile(fname)
                 self.image = QImage()
                 for action, check in self.resetableActions:
@@ -357,7 +357,6 @@ class MainWindow(QMainWindow):
                 self.sizeLabel.setText("{} x {}".format(
                     image.width(), image.height()))
                 message = "Loaded {}".format(os.path.basename(fname))
-            print("Going to updateStatus(message)")
             self.updateStatus(message)
 
 
@@ -365,14 +364,13 @@ class MainWindow(QMainWindow):
         if fname is None:
             return
         if fname not in self.recentFiles:
-            self.recentFiles = [fname] + self.recentFiles[:7]
+            self.recentFiles = [fname] + self.recentFiles[:8]
 
 
     def fileSave(self):
         if self.image.isNull():
             return True
         if self.filename is None:
-            print("File Save:{}".format(self.filename))
             return self.fileSaveAs()
         else:
             if self.image.save(self.filename, None):
@@ -428,14 +426,6 @@ class MainWindow(QMainWindow):
                                 size.height())
             painter.drawImage(0, 0, self.image)
 
-    # class MyLabel(QWidget):
-    #     def paintEvent(self, event):
-    #         painter = QPainter(self)
-    #         painter.setPen(Qt.black)
-    #         painter.translate(20, 100)
-    #         painter.rotate(-90)
-    #         painter.drawText(0, 0, "hellos")
-    #         painter.end()
 
     def editInvert(self, on):
         if self.image.isNull():
@@ -496,9 +486,28 @@ class MainWindow(QMainWindow):
         if ok:
             self.zoomSpinBox.setValue(percent)
 
+    def editResize(self):
+        if self.image.isNull():
+            return
+        form = resizedlg.ResizeDlg(self.image.width(),
+                                   self.image.height(), self)
+        if form.exec_():
+            width, height = form.result()
+            if (width == self.image.width() and
+                height == self.image.height()):
+                self.statusBar().showMessage("Resized to the same size",
+                                             5000)
+            else:
+                self.image = self.image.scaled(width, height)
+                self.showImage()
+                self.dirty = True
+                size = "{} x {}".format(self.image.width(),
+                                          self.image.height())
+                self.sizeLabel.setText(size)
+                self.updateStatus("Resized to {}".format(size))
+
 
     def showImage(self, percent=None):
-        print("showImage")
         if self.image.isNull():
             return
         if percent is None:

@@ -294,10 +294,12 @@ class MainWindow(QMainWindow):
                 "Image Changer - Choose Image", dir,
                 "Image files ({})".format(" ".join(formats)))
         if fname:
-            self.loadFile(fname)
+            self.loadFile(fname[0])
 
 
     def loadFile(self, fname=None):
+        if fname is False:
+            fname = None
         if fname is None:
             action = self.sender()
             if isinstance(action, QAction):
@@ -437,7 +439,7 @@ class MainWindow(QMainWindow):
     def editZoom(self):
         if self.image.isNull():
             return
-        percent, ok = QInputDialog.getInteger(self,
+        percent, ok = QInputDialog.getInt(self,
                 "Image Changer - Zoom", "Percent:",
                 self.zoomSpinBox.value(), 1, 400)
         if ok:
