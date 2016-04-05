@@ -489,7 +489,7 @@ class MainWindow(QMainWindow):
     def editResize(self):
         if self.image.isNull():
             return
-        form = resizedlg.ResizeDlg(self.image.width(),
+        form = resizemenu.ResizeDlg(self.image.width(),
                                    self.image.height(), self)
         if form.exec_():
             width, height = form.result()
