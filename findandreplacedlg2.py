@@ -1,3 +1,16 @@
+# In porting this from PyQt4 I had to create two signals that
+# were created in-line in the original program like this:
+#   form.connect(form, SIGNAL("found"), found)
+#   form.connect(form, SIGNAL("notfound"), nomore)
+
+# This syntax is no longer possible with PyQt5 and the new style
+# signals. The signal must be declared as a class atribute and as
+# such must be declared as the first item in the class before any
+# method definition. The notfound signal doesn't take an argument so
+# none is given in the declaration. found returns the index of where
+# the text was found so it takes an integer argument which must be
+# declared like so: found = pyqtSignal(int) vs notfound = pyqtSignal()
+
 import re
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -10,8 +23,9 @@ try:
 except ImportError:
     MAC = False
 
+
 class FindAndReplaceDlg(QDialog, Ui_FindAndReplaceDlg):
-    found = pyqtSignal()
+    found = pyqtSignal(int)
     notfound = pyqtSignal()
 
     def __init__(self, text, parent=None):
@@ -30,12 +44,24 @@ class FindAndReplaceDlg(QDialog, Ui_FindAndReplaceDlg):
         self.updateUi()
         # self.findButton.clicked.connect(self.test)
 
-    # @pyqtSlot()
+    @pyqtSlot(str)
     def on_findLineEdit_textEdited(self, text):
         self.__index = 0
         self.updateUi()
 
-    @pyqtSlot(str)
+    def makeRegex(self):
+        print("makeRegex")
+        findText = self.findLineEdit.text()
+        if self.syntaxComboBox.currentText() == "Literal":
+            findText = re.escape(findText)
+        flags = re.MULTILINE|re.DOTALL|re.UNICODE
+        if not self.caseCheckBox.isChecked():
+            flags |= re.IGNORECASE
+        if self.wholeCheckBox.isChecked():
+            findText = r"\b{}\b".format(findText)
+        return re.compile(findText, flags)
+
+    @pyqtSlot()
     def on_findButton_clicked(self):
         regex = self.makeRegex()
         match = regex.search(self.__text, self.__index)
@@ -44,12 +70,13 @@ class FindAndReplaceDlg(QDialog, Ui_FindAndReplaceDlg):
             self.found.emit(match.start())
         else:
             self.notfound.emit()
-    @pyqtSlot(str)
+
+    @pyqtSlot()
     def on_replaceButton_clicked(self):
         regex = self.makeRegex()
         self.__text = regex.sub(self.replaceLineEdit.text(), self.__text, 1)
 
-    @pyqtSlot(str)
+    @pyqtSlot()
     def on_replaceAllButton_clicked(self):
         regex = self.makeRegex()
         self.__text = regex.sub(self.replaceLineEdit.text(), self.__text)
@@ -95,14 +122,11 @@ http://www.effi.org/patentit/patents_torvalds_cox.html"""
 
     app = QApplication(sys.argv)
     form = FindAndReplaceDlg(text)
-    # ui = Ui_FindAndReplaceDlg()
-    # ui.setupUi(FindAndReplaceDlg)
+    form.found.connect(found)
+    form.notfound.connect(nomore)
     form.show()
-    sys.exit(app.exec_())
-    # form = FindAndReplaceDlg(text)
-    # form.found.connect(found)
-    # form.notfound.connect(nomore)
-    # form.show()
-    # app.exec_()
-    # print(form.text())
+    # sys.exit(app.exec_())
+
+    app.exec_()
+    print(form.text())
 
